@@ -17,11 +17,6 @@ nextflow.enable.dsl = 2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
-params.fasta = WorkflowMain.getGenomeAttribute(params, 'fasta')
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     VALIDATE & PRINT PARAMETER SUMMARY
@@ -52,13 +47,13 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { TERRATOAWS } from './workflows/terratoaws'
+include { TERRA2AWS } from './workflows/terra2aws'
 
 //
 // WORKFLOW: Run main nf-core/terratoaws analysis pipeline
 //
-workflow NFCORE_TERRATOAWS {
-    TERRATOAWS ()
+workflow NFCORE_TERRA2AWS {
+    TERRA2AWS ()
 }
 
 /*
@@ -72,7 +67,7 @@ workflow NFCORE_TERRATOAWS {
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
 workflow {
-    NFCORE_TERRATOAWS ()
+    NFCORE_TERRA2AWS ()
 }
 
 /*
