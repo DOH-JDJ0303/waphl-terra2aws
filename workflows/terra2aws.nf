@@ -81,8 +81,10 @@ workflow TERRA2AWS {
         ch_some_new
     )
 
+    CMP_TABLES.out.tables.concat(ch_all_new).transpose().view()
+
     COL_FILES (
-        CMP_TABLES.out.tables.transpose().concat(ch_all_new.transpose())
+        CMP_TABLES.out.tables.concat(ch_all_new).transpose()
     )
 
     ch_manifest

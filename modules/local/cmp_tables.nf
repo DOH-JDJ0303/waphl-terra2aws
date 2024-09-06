@@ -10,7 +10,7 @@ process CMP_TABLES {
     tuple val(terra_project), val(terra_workspace), path(new_tables, stageAs: "new/*"), path(old_tables, stageAs: "old")
 
     output:
-    tuple val(terra_project), val(terra_workspace), path('delta/*'), emit: tables
+    tuple val(terra_project), val(terra_workspace), path('delta/*'), emit: tables, optional: true
     //path "versions.yml", emit: versions
 
     when:
