@@ -1,11 +1,12 @@
-process EXTRACT_ID {
+process PUSH_META {
     label 'process_low'
+    publishDir "${publish_dir}"
 
     input:
-    tuple val(name), val(patterns)
+    path metadata
 
     output:
-    tuple val(name), env(id), emit: ids
+    path metadata
     //path "versions.yml", emit: versions
 
     when:
@@ -13,7 +14,6 @@ process EXTRACT_ID {
 
     script:
     """
-    extract_ids.py -i "${name}" --patterns ${patterns}
-    id=\$(cat ids.csv)
+    ls
     """
 }

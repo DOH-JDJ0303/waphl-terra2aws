@@ -1,13 +1,8 @@
 process GET_TIMESTAMP {
     label 'process_single'
 
-    //conda "conda-forge::python=3.8.3"
-    //container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-    //    'https://depot.galaxyproject.org/singularity/python:3.8.3' :
-    //    'biocontainers/python:3.8.3' }"
-
     input:
-    val gs_file
+    tuple val(gs_file), path(google_cred_json)
 
     output:
     path "timestamp.csv", emit: timestamp
@@ -16,9 +11,17 @@ process GET_TIMESTAMP {
     when:
     task.ext.when == null || task.ext.when
 
+    gcred_cmd = file(google_cred_json).getExtension() == "gz" ? "tar -xzf ${google_cred_json} -C ~/.config/gcloud/" : "mv ${google_cred_json} ~/.config/gcloud"
+
     script:
     """
+    # set google credentials
+    mkdir -p ~/.config/gcloud/ || true
+    ${gcred_cmd}
+
+    google_project=\$(cat ~/.config/gcloud/application_default_credentials.json | grep quota_project_id | sed 's/.*: //g' | tr -d '\n\r\t ",')
+
     # get list of tables
-    get_timestamp.py -i ${gs_file}
+    get_timestamp.py -i ${gs_file} -p \${google_project}
     """
 }

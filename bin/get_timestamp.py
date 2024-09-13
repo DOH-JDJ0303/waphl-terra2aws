@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import argparse
 from google.cloud import storage
 
@@ -10,7 +11,13 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-i',
                     '--input',
                     help = 'Google file')
+parser.add_argument('-p',
+                    '--project',
+                    help = 'Google project')
 args = parser.parse_args()
+
+# set Google project
+os.environ.setdefault("GCLOUD_PROJECT", args.project)
 
 #------ GET TIMESTAMP ------#
 gs_path = args.input.split('gs://')[1] # bucket/path/to/file.txt
