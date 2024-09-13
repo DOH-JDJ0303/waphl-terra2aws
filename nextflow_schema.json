@@ -263,6 +263,10 @@
         "run_time": {
             "type": "string",
             "default": ""
+        },
+        "max_tables": {
+            "type": "integer",
+            "default": 1
         }
     }
 }
