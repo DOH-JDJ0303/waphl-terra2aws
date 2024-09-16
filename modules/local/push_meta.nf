@@ -6,7 +6,8 @@ process PUSH_META {
     path metadata
 
     output:
-    path metadata
+    path metadata, optional: true
+    env wait_var, emit: wait
     //path "versions.yml", emit: versions
 
     when:
@@ -14,6 +15,11 @@ process PUSH_META {
 
     script:
     """
-    ls
+    wait_var="wait for me!"
+    # remove metadata file if it only contains column line - avoids pushing empty tables
+    if [[ \$( cat ${metadata} | wc -l ) == 1 ]]
+    then
+        rm ${metadata}
+    fi
     """
 }

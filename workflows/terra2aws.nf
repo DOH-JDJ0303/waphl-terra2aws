@@ -130,15 +130,35 @@ workflow TERRA2AWS {
         ch_files.map{ project, workspace, t_workflow, d_workflow, sample, file, patterns -> [ sample, patterns ] }.unique()
     )
 
-    // Filter files based on multiple criteria
+    // Prepare channel for filtering
     ch_files
         .map{ project, workspace, t_workflow, d_workflow, sample, file, patterns -> [ sample, project, workspace, t_workflow, d_workflow, file ] } // drop the regex patterns
         .combine(EXTRACT_ID.out.ids, by: 0) // combine with extracted sample IDs - those not matching a supplied regex pattern will be "None"
         .map{ sample, project, workspace, t_workflow, d_workflow, file, id -> [ project, workspace, t_workflow, d_workflow, sample, id, file ] } // reorder fields
-        .filter{ project, workspace, t_workflow, d_workflow, sample, id, file -> file.startsWith("gs://") & id != "None"  } // select files that are Google URL paths and that matched a supplied regex pattern
         .map{ project, workspace, t_workflow, d_workflow, sample, id, file ->  [ project, workspace, t_workflow, d_workflow, file.tokenize('/')[4], sample, id, file ]} // Extract the workflow name from the Google URL path
+        .set{ ch_files }
+    // Filter 1: Sample ID regex
+    ch_files
+        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> id == "None"  }
+        .set{ ch_regex }
+    ch_files
+        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> id != "None"  }
+        .set{ ch_files }
+    // Filter 2: Workflow name
+    ch_files
+        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow != a_workflow  } // filter files that match the target workflow
+        .set{ ch_wkflw }
+    ch_files
         .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow == a_workflow  } // filter files that match the target workflow
-        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file ->  [ file, project, workspace, d_workflow, sample, id ]} // drop the target and extracted workflow names
+        .set{ ch_files }
+    // Combine filtered samples & remove unneeded fields
+    ch_regex
+        .combine(ch_wkflw)
+        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file ->  [ file, project, workspace, d_workflow, sample, id ]}
+        .set{ ch_filtered }
+    // Remove unneeded fields from ch_files
+    ch_files
+        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file ->  [ file, project, workspace, d_workflow, sample, id ]}
         .set{ ch_files }
 
     // MODULE: Get timestamp for each file from Google
@@ -162,7 +182,6 @@ workflow TERRA2AWS {
         PUSH FILES, METADATA, & NEW TERRA TABLES
     =============================================================================================================================
     */
-    table_list = ch_tables.map{ project, workspace, tables -> tables }.toList()
     if (!params.dryrun){
         // MODULE: Push Google files to results directory
         PUSH_FILES (
@@ -202,10 +221,9 @@ workflow TERRA2AWS {
         )
         // MODULE: Push new Terra tables to results directory
         PUSH_TABLES (
-            ch_tables.groupTuple(by:[0,1]).combine(ch_metadata) // forces this to wait till the end when all files have been transferred
+            ch_tables.groupTuple(by:[0,1]).combine(PUSH_META.out.wait) // forces this to wait till the end when all files have been transferred
         )
     }
-    
 }
 
 /*

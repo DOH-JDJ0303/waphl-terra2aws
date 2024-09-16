@@ -253,8 +253,8 @@
     ],
     "properties": {
         "dryrun": {
-            "type": "string",
-            "default": "false"
+            "type": "boolean",
+            "default": false
         },
         "dev": {
             "type": "boolean",
