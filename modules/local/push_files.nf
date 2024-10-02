@@ -29,7 +29,7 @@ process PUSH_FILES {
         LINE=\$(echo \$LINE | tr -d '\t\r\n ')
         # extract info
         GS_PATH=\$(echo \$LINE | cut -f 4 -d ',')
-        NEW_PATH=\$(echo \$LINE | awk -v FS=',' '{print "data/id="\$1"/workflow="\$7"/file="\$3"/timestamp="\$5}')
+        NEW_PATH=\$(echo \$LINE | awk -v FS=',' '{print "data/id="\$1"/workflow="\$7"/file="\$3"/timestamp="\$5"/"\$3}')
         FILE_NAME=\$(echo \$LINE | cut -f 3 -d ',')
 
         # copy files
