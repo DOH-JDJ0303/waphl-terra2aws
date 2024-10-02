@@ -122,7 +122,7 @@ workflow TERRA2AWS {
         .transpose()
         .combine( ch_manifest.map{ tuple(it.terra_project, it.terra_workspace, it.terra_workflow_name, it.sample_patterns) }, by: [0,1,2] )
         .set{ ch_files }
-    
+
     params.dev ? ch_files.take(5).set{ ch_files } : ch_files
     
     // MODULE: Extract the sample IDs based on supplied regex patterns. Only return samples that matched these patterns.
@@ -140,26 +140,30 @@ workflow TERRA2AWS {
     // Filter 1: Sample ID regex
     ch_files
         .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> id == "None"  }
+        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> [ project, workspace, a_workflow, sample, file, "ID does not match regex" ] }
         .set{ ch_regex }
     ch_files
         .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> id != "None"  }
         .set{ ch_files }
     // Filter 2: Workflow name
     ch_files
-        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow != a_workflow  } // filter files that match the target workflow
+        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow != a_workflow  } 
+        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> [ project, workspace, a_workflow, sample, file, "Workflow does not match target" ] }
         .set{ ch_wkflw }
     ch_files
-        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow == a_workflow  } // filter files that match the target workflow
+        .filter{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file -> t_workflow == a_workflow  }
         .set{ ch_files }
-    // Combine filtered samples & remove unneeded fields
-    ch_regex
-        .combine(ch_wkflw)
-        .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file ->  [ file, project, workspace, d_workflow, sample, id ]}
-        .set{ ch_filtered }
     // Remove unneeded fields from ch_files
     ch_files
         .map{ project, workspace, t_workflow, d_workflow, a_workflow, sample, id, file ->  [ file, project, workspace, d_workflow, sample, id ]}
         .set{ ch_files }
+    // Combine filtered files and report
+    ch_regex.concat(ch_wkflw).set{ ch_filt }
+    Channel.of(["PROJECT","WORKSPACE","WORKFLOW","SAMPLE","FILE","FILTER"])
+        .concat(ch_filt)
+        .map{ project, workspace, a_workflow, sample, file, filter -> project+","+workspace+","+a_workflow+","+sample+","+file+","+filter }
+        .collectFile(name: "filter_${params.run_time}.csv", sort: 'index', newLine: true)
+        .subscribe{ filters -> file(filters).copyTo(file(params.outdir).resolve("logs"))}
 
     // MODULE: Get timestamp for each file from Google
     GET_TIMESTAMP (
@@ -174,7 +178,6 @@ workflow TERRA2AWS {
     
     ch_files
         .join( timestamps, by: 0 )
-        .map{ gs_file, project, workspace, d_workflow, sample, id, timestamp -> [ id, sample, file(gs_file).getName(), gs_file, timestamp, workspace, d_workflow, params.google_cred ? params.google_cred : "${workflow.homeDir}/.config/gcloud/" ] }
         .set{ ch_files }
 
     /*
@@ -183,45 +186,19 @@ workflow TERRA2AWS {
     =============================================================================================================================
     */
     if (!params.dryrun){
+        ch_files
+            .map{ gs_file, project, workspace, d_workflow, sample, id, timestamp -> "${id},${sample},${file(gs_file).getName()},${gs_file},${timestamp},${workspace},${d_workflow}" }
+            .collectFile(name: "file-list.csv", newLine: true)
+            .map{ meta -> [ meta, params.google_cred ? params.google_cred : "${workflow.homeDir}/.config/gcloud/" ] }
+            .set{ ch_push_files }
+        
         // MODULE: Push Google files to results directory
         PUSH_FILES (
-            ch_files
+            ch_push_files
         )
-
-        // MODULE: Push metadata file to results directory
-        Channel.of( ["ID",
-                    "ALT_ID",
-                    "FILE",
-                    "ORIGIN_PATH",
-                    "STAGED_PATH",
-                    "CURRENT_PATH",
-                    "TIMESTAMP",
-                    "PLATFORM",
-                    "WORKSPACE",
-                    "WORKFLOW" ] )
-            .concat(PUSH_FILES.out.metadata)
-            .map{ 
-                id, 
-                alt_id,
-                file,
-                origin_path,
-                staged_path,
-                current_path,
-                timestamp,
-                platform,
-                workspace,
-                workflow ->
-                id+","+alt_id+","+file+","+origin_path+","+current_path+","+timestamp+","+platform+","+workspace+","+workflow
-                }
-            .collectFile(name: "meta_${params.run_time}.csv", sort: 'index', newLine: true)
-            .set{ ch_metadata }
-
-        PUSH_META (
-            ch_metadata
-        )
-        // MODULE: Push new Terra tables to results directory
+        // MODULE: Push new Terra tables to results directory        
         PUSH_TABLES (
-            ch_tables.groupTuple(by:[0,1]).combine(PUSH_META.out.wait) // forces this to wait till the end when all files have been transferred
+            ch_tables.groupTuple(by:[0,1])
         )
     }
 }

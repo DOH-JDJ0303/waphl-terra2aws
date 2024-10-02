@@ -1,9 +1,8 @@
 process PUSH_TABLES {
     label 'process_low'
-    publishDir "${publish_dir}"
 
     input:
-    tuple val(project), val(workspace), path(table), val(metadata)
+    tuple val(project), val(workspace), path(table)
 
     output:
     path table
